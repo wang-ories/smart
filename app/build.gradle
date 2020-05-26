@@ -2,6 +2,7 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 apply plugin: 'de.undercouch.download'
+apply plugin: 'kotlin-kapt'
 
 android {
     compileSdkVersion 29
@@ -37,24 +38,49 @@ android {
 }
 // import DownloadModels task
 project.ext.ASSET_DIR = projectDir.toString() + '/src/main/assets'
-project.ext.TMP_DIR   = project.buildDir.toString() + '/downloads'
+project.ext.TMP_DIR = project.buildDir.toString() + '/downloads'
 
 // Download default models; if you wish to use your own models then
 // place them in the "assets" directory and comment out this line.
 //apply from: "tf_model.gradle"
 
-apply from:'tf_model.gradle'
+apply from: 'tf_model.gradle'
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'androidx.appcompat:appcompat:1.0.2'
     implementation 'androidx.core:core-ktx:1.0.2'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation "androidx.constraintlayout:constraintlayout:$constraintLayoutVersion"
+    implementation "com.google.android.material:material:$materialVersion"
+
+    // architecture components
+    implementation "androidx.lifecycle:lifecycle-extensions:$archComponentsVersion"
+    implementation "androidx.lifecycle:lifecycle-runtime:$archComponentsVersion"
+    implementation "androidx.room:room-runtime:$roomVersion"
+    implementation "androidx.paging:paging-runtime:$pagingVersion"
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    kapt "androidx.lifecycle:lifecycle-compiler:$archComponentsVersion"
+    kapt "androidx.room:room-compiler:$roomVersion"
+
+    // retrofit
+    implementation "com.squareup.retrofit2:retrofit:$retrofitVersion"
+    implementation "com.squareup.retrofit2:converter-gson:$retrofitVersion"
+    implementation "com.squareup.retrofit2:retrofit-mock:$retrofitVersion"
+    implementation "com.squareup.okhttp3:logging-interceptor:$okhttpLoggingInterceptorVersion"
+    // TF lite
+    implementation('org.tensorflow:tensorflow-lite:0.0.0-nightly') { changing = true }
+
+
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
-    // TF lite
-    implementation('org.tensorflow:tensorflow-lite:0.0.0-nightly') { changing = true }
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.0.0'
+    implementation 'androidx.navigation:navigation-ui-ktx:2.0.0'
+
+    // Navigation
+    implementation "android.arch.navigation:navigation-fragment-ktx:$navigationVersion"
+    implementation "android.arch.navigation:navigation-ui-ktx:$navigationVersion"
+
 
 }
