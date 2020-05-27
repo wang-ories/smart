@@ -6,6 +6,6 @@
         android:left="10dp"
         android:right="10dp"
         android:top="0dp" />
-    <solid android:color="@color/colorAccent" />
+    <solid android:color="@color/colorButton" />
 
 </shape>

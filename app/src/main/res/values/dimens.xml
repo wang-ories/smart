@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="face_height" type="dimen" format="float">0.4</item>
+    <item name="face_height" type="dimen" format="float">0.5</item>
     <dimen name="button_height">36dp</dimen>
+    <dimen name="select_size">14sp</dimen>
+    <dimen name="vertical_margin">32dp</dimen>
+    <dimen name="vertical_margin_separator">48dp</dimen>
+    <dimen name="select_size_header">16sp</dimen>
+    <dimen name="vertical_margin_small">16dp</dimen>
 </resources>

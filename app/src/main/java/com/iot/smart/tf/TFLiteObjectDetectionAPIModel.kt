@@ -18,18 +18,18 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Trace
+import android.util.Log
 import com.iot.smart.tf.Classifier.Recognition
+import org.jetbrains.annotations.NotNull
 import org.tensorflow.lite.Interpreter
 import java.io.BufferedReader
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.*
-import java.util.logging.Logger
 
 /**
  * Wrapper for frozen detection models trained using the Tensorflow Object Detection API:
@@ -237,9 +237,12 @@ class TFLiteObjectDetectionAPIModel private constructor() : Classifier {
             val br =
                 BufferedReader(InputStreamReader(labelsInput))
             var line: String
-            while (br.readLine().also { line = it } != null) {
-                //LOGGER.w(line)
-                d.labels.add(line)
+            try {
+                while (br.readLine().also { line = it } != null) {
+                    d.labels.add(line)
+                }
+            }catch(e: Exception){
+
             }
             br.close()
             d.inputSize = inputSize
