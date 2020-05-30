@@ -354,6 +354,10 @@ class DetectionActivity : AppCompatActivity(){
                 if (result.title in classes) {
                     ++totalCount
                     ++count
+                    category_layout.visibility = View.VISIBLE
+                    category_info.setTextColor(resources.getColor(R.color.colorButton))
+                    category.setTextColor(resources.getColor(R.color.colorButton))
+                    category_info.text = "${result.title.toUpperCase()}"
                 }else{
                     category_layout.visibility = View.VISIBLE
                     category_info.text = "${result.title.toUpperCase()}"
