@@ -9,8 +9,18 @@
 
     <fragment
         android:id="@+id/selectOptionFragment"
-        android:name="com.iot.smart.options.SelectOptionFragment"
+        android:name="com.iot.smart.fragment.SelectOptionFragment"
         android:label="fragment_select_option"
-        tools:layout="@layout/fragment_select_option" />
+        tools:layout="@layout/fragment_select_option" >
+        <action
+            android:id="@+id/action_selectOptionFragment_to_detectionActivity"
+            app:destination="@id/detectionActivity" />
+    </fragment>
+
+    <activity
+        android:id="@+id/detectionActivity"
+        android:name="com.iot.smart.DetectionActivity"
+        android:label="activity_detection"
+        tools:layout="@layout/activity_detection" />
 
 </navigation>

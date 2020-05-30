@@ -17,6 +17,7 @@ package com.iot.smart.utils
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Environment
+import android.util.Log
 import timber.log.Timber
 import timber.log.Timber.i
 import java.io.File
@@ -55,16 +56,15 @@ object ImageUtils {
     @JvmOverloads
     fun saveBitmap(bitmap: Bitmap, filename: String = "preview.png") {
         val root = Environment.getExternalStorageDirectory()
-            .absolutePath + File.separator + "tensorflow"
-        Timber.i(
-            "Saving %dx%d bitmap to %s.",
-            bitmap.width,
-            bitmap.height,
-            root
+            .absolutePath + File.separator + "smart"
+        Log.i("Huang",
+            "Saving %dx%d bitmap to %s."+ bitmap.width
+            +bitmap.height
+            +root
         )
         val myDir = File(root)
         if (!myDir.mkdirs()) {
-            Timber.i("Make dir failed")
+            Log.i("Huang","Make dir failed")
         }
         val file = File(myDir, filename)
         if (file.exists()) {
@@ -76,7 +76,8 @@ object ImageUtils {
             out.flush()
             out.close()
         } catch (e: Exception) {
-            Timber.e(e, "Exception!")
+            Log.i("Huang","Exception"+e)
+
         }
     }
 

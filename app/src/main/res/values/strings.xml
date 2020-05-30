@@ -6,4 +6,10 @@
     <string name="video_action">"Use Video "</string>
     <string name="select_option">Please start by selecting one option.You can choose between camera or video feed. </string>
     <string name="select_option_header">SMART CAMERA</string>
+    <string name="camera_loop">Camera Loop</string>
+    <string name="take_photo">Capture</string>
+    <string name="statistics">"Statistics "</string>
+    <string name="total_person">Total detected persons</string>
+    <string name="total_person_in_frame">Total person in frame .....</string>
+    <string name="frame">Person in frame</string>
 </resources>
