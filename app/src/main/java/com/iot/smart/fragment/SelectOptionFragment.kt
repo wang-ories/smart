@@ -34,25 +34,15 @@ class SelectOptionFragment : Fragment() {
         var cameraOption = rootView.findViewById<Button>(R.id.camera_option)
         cameraOption.setOnClickListener {
             var i = Intent(rootView.context, DetectionActivity::class.java)
-            i.putExtra("cameraMode", 0)
+            i.putExtra("cameraMode", 1)
             startActivity(i)
         }
         var videoOption = rootView.findViewById<Button>(R.id.video_option)
         videoOption.setOnClickListener {
             var i = Intent(rootView.context, DetectionActivity::class.java)
-            i.putExtra("cameraMode", 1)
+            i.putExtra("cameraMode", 0)
             startActivity(i)
         }
-       /* var croppedBitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(croppedBitmap)
-        val paint = Paint()
-        paint.color = Color.RED
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2.0f
-        canvas.drawRect(RectF(100F, 100F, 200F, 200F), paint)
-
-        */
-
         return rootView
     }
 

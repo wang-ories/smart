@@ -8,7 +8,7 @@
     android:background="@color/colorPrimaryDark"
     tools:context=".DetectionActivity">
 
-    <RelativeLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/color_semi_transparent"
@@ -16,35 +16,47 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <com.iot.smart.OverlayView
-            android:id="@+id/tracking_overlay"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:elevation="2dp"
-            android:scaleType="centerCrop" />
-
-        <ImageView
-            android:id="@+id/cameraPreview"
-            android:layout_width="640dp"
-            android:layout_height="480dp"
-            android:scaleType="centerCrop"
-            tools:visibility="gone" />
-
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:layout_alignParentTop="true"
-            app:title="@string/app_name"
-            app:titleTextColor="@color/colorAccent"
             android:background="@color/color_semi_transparent"
             android:elevation="2dp"
-            />
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:title="@string/app_name"
+            app:titleTextAppearance="@style/TextAppearance.MaterialComponents.Body2"
+            app:titleTextColor="@android:color/white" />
+
+        <com.iot.smart.OverlayView
+            android:id="@+id/tracking_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:elevation="2dp"
+            android:scaleType="center"
+            app:layout_constraintBottom_toTopOf="@+id/stats_container"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+
+        <ImageView
+            android:id="@+id/cameraPreview"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="center"
+            app:layout_constraintBottom_toTopOf="@+id/stats_container"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            tools:visibility="gone" />
 
         <androidx.camera.view.PreviewView
             android:id="@+id/viewFinder"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/stats_container"
             android:visibility="visible" />
 
 
@@ -54,8 +66,8 @@
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
             android:layout_marginBottom="@dimen/vertical_margin"
-            android:paddingLeft="@dimen/vertical_margin_small"
-            android:paddingRight="@dimen/vertical_margin_small"
+            android:backgroundTint="@color/colorPrimary"
+            android:padding="@dimen/vertical_margin_small"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent">
@@ -64,6 +76,7 @@
                 android:id="@+id/inference_stats"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:fontFamily="@font/roboto_light"
                 android:text="@string/statistics"
                 android:textAllCaps="true"
                 android:textColor="@android:color/white"
@@ -82,18 +95,48 @@
                 app:layout_constraintTop_toBottomOf="@+id/inference_stats" />
 
             <LinearLayout
+                android:id="@+id/category_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/inference_separator"
+                tools:visibility="gone">
+
+                <TextView
+                    android:id="@+id/category"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
+                    android:text="@string/category"
+                    android:textColor="@android:color/holo_red_dark" />
+
+                <TextView
+                    android:id="@+id/category_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
+                    android:gravity="right"
+                    android:text="N/A"
+                    android:textColor="@android:color/holo_red_dark" />
+
+            </LinearLayout>
+            <LinearLayout
                 android:id="@+id/stats_layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/inference_separator">
+                app:layout_constraintTop_toBottomOf="@+id/category_layout">
 
                 <TextView
                     android:id="@+id/time_running"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:text="Running time ....."
                     android:textColor="@android:color/white" />
 
@@ -102,6 +145,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:gravity="right"
                     android:textColor="@android:color/white" />
 
@@ -120,6 +164,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:text="@string/frame"
                     android:textColor="@android:color/white" />
 
@@ -128,6 +173,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:gravity="right"
                     android:textColor="@android:color/white" />
 
@@ -146,6 +192,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:text="@string/total_person"
                     android:textColor="@android:color/white" />
 
@@ -154,6 +201,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:gravity="right"
                     android:text="0"
                     android:textColor="@android:color/white" />
@@ -173,6 +221,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:text="Inference Time ....."
                     android:textColor="@android:color/white" />
 
@@ -181,6 +230,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:fontFamily="@font/roboto_light"
                     android:gravity="right"
                     android:textColor="@android:color/white" />
 
@@ -190,23 +240,22 @@
 
         <Button
             android:id="@+id/camera_capture_button"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/button_height"
+            android:layout_width="@dimen/camera_button"
+            android:layout_height="@dimen/camera_button"
             android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
             android:layout_marginBottom="@dimen/vertical_margin"
             android:background="@drawable/custom_camera_button"
-            android:drawableStart="@drawable/ic_camera_alt_white_24dp"
             android:drawablePadding="5dp"
             android:elevation="2dp"
             android:scaleType="fitCenter"
-            android:text="@string/take_photo"
             android:textColor="@android:color/darker_gray"
             android:visibility="visible"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent" />
-    </RelativeLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
 
 

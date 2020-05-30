@@ -11,7 +11,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center_horizontal">
-
         <ImageView
             android:id="@+id/ic_face"
             android:layout_width="match_parent"
@@ -19,41 +18,41 @@
             android:layout_marginTop="@dimen/vertical_margin"
             android:scaleType="centerInside"
             android:src="@drawable/ic_face_id"
-            app:layout_constraintHeight_percent="@dimen/face_height"
+            app:layout_constraintHeight_percent="0.35"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
-
-
         <TextView
             android:id="@+id/select_option_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/select_option_header"
-            android:textStyle="bold"
-            android:textFontWeight="700"
-            android:gravity="left"
+            android:layout_marginTop="@dimen/vertical_margin"
             android:fontFamily="@font/roboto_light"
+            android:gravity="left"
+            android:text="@string/select_option_header"
             android:textColor="@color/colorButton"
+            android:textFontWeight="700"
             android:textSize="@dimen/select_size_header"
-            app:layout_constraintTop_toBottomOf="@id/ic_face"
+            android:textStyle="bold"
             app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent" />
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/ic_face" />
 
         <TextView
             android:id="@+id/select_option"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/select_option"
-            android:textStyle="normal"
-            android:textFontWeight="300"
             android:layout_marginTop="@dimen/vertical_margin_small"
             android:fontFamily="@font/roboto_light"
+            android:text="@string/select_option"
+            android:textAlignment="center"
             android:textColor="@android:color/darker_gray"
+            android:textFontWeight="300"
             android:textSize="@dimen/select_size"
-            app:layout_constraintWidth_percent="0.7"
-            app:layout_constraintTop_toBottomOf="@id/select_option_header"
+            android:textStyle="normal"
             app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent" />
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/select_option_header"
+            app:layout_constraintWidth_percent="0.7" />
 
 
         <Button
@@ -75,7 +74,7 @@
             android:layout_width="wrap_content"
             android:layout_height="@dimen/button_height"
             android:layout_marginTop="@dimen/vertical_margin_separator"
-            android:background="@drawable/custom_camera_button"
+            android:background="@drawable/custom_rounded"
             android:drawableLeft="@drawable/ic_play_circle_outline_white_24dp"
             android:drawablePadding="5dp"
             android:text="@string/video_action"
@@ -85,10 +84,4 @@
             app:layout_constraintTop_toBottomOf="@id/select_option" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-
-
-
-
-
 </FrameLayout>

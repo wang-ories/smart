@@ -48,7 +48,7 @@ class SingleBoxTracker(context: Context) {
 
     @Synchronized
     fun trackResults(
-        results: MutableList<Classifier.Recognition>,
+        results: MutableList<Recognition>,
         timestamp: Long
     ) {
         processResults(results)
@@ -75,13 +75,7 @@ class SingleBoxTracker(context: Context) {
             boxPaint.color = recognition.color
             val cornerSize = 0F
             canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint)
-            val labelString =
-                if (!TextUtils.isEmpty(recognition.title)) String.format(
-                    "%s %.2f",
-                    recognition.title,
-                    100 * recognition.detectionConfidence
-                ) else String.format("%.2f", 100 * recognition.detectionConfidence)
-            //            borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.top,
+
         }
     }
 
@@ -172,7 +166,7 @@ class SingleBoxTracker(context: Context) {
         }
         boxPaint.color = Color.RED
         boxPaint.style = Paint.Style.STROKE
-        boxPaint.strokeWidth = 4.0f
+        boxPaint.strokeWidth = 6.0f
         textSizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             TEXT_SIZE_DIP,
