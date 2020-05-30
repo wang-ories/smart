@@ -361,6 +361,8 @@ class DetectionActivity : AppCompatActivity(){
                 }else{
                     category_layout.visibility = View.VISIBLE
                     category_info.text = "${result.title.toUpperCase()}"
+                    category_info.setTextColor(resources.getColor(R.color.colorButtonRed))
+                    category.setTextColor(resources.getColor(R.color.colorButtonRed))
                 }
                 total_persons_info.text = "$totalCount"
                 frame_info.text = count.toString()

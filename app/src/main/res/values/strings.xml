@@ -4,7 +4,7 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="camera_action">"Use Camera"</string>
     <string name="video_action">"Use Video "</string>
-    <string name="select_option"><b>Smart 0.1</b> allow you to count the number of person(s) in video or camera frame.\nPlease start by selecting one option.You can choose between camera or video feed.</string>
+    <string name="select_option"><b>Smart 0.1</b> allow you to count the number of person in video or camera frame.\nPlease start by selecting one option.You can choose between camera or video feed.</string>
     <string name="select_option_header">SMART CAMERA</string>
     <string name="camera_loop">Camera Loop</string>
     <string name="take_photo">Capture</string>
