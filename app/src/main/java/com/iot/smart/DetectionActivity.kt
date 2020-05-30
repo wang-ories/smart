@@ -1,353 +1,278 @@
 package com.iot.smart
 
 import android.Manifest
-import android.app.Fragment
+import android.annotation.SuppressLint
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.*
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
-import android.media.Image.Plane
-import android.media.ImageReader
+import android.media.Image
+import android.net.Uri
 import android.os.*
+import android.util.AttributeSet
 import android.util.Log
 import android.util.Size
-import android.widget.Toast
+import android.view.View
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.camera.core.*
+import androidx.camera.core.Camera
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
 import com.iot.smart.tf.Classifier
+import com.iot.smart.tf.Classifier.Recognition
 import com.iot.smart.tf.TFLiteObjectDetectionAPIModel
 import com.iot.smart.utils.ImageUtils
+import com.iot.smart.utils.SingleBoxTracker
+import kotlinx.android.synthetic.main.activity_detection.*
 import timber.log.Timber
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
-class DetectionActivity : AppCompatActivity(), ImageReader.OnImageAvailableListener{
 
-    private val PERMISSION_CAMERA = Manifest.permission.CAMERA
-    private val PERMISSIONS_REQUEST = 1
+typealias DetectionListener = (results: Bitmap) -> Unit
 
+class DetectionActivity : AppCompatActivity(){
     // Configuration values for the prepackaged SSD model.
-    private val TF_OD_API_INPUT_SIZE = 300
-    private val TF_OD_API_IS_QUANTIZED = true
-    private val TF_OD_API_MODEL_FILE = "detect.tflite"
-    private val TF_OD_API_LABELS_FILE = "file:///android_asset/labelmap.txt"
+    private val isQuantized = true
+    private val apiInputSize = 300
+    private val  modelFile = "detect.tflite"
+    private val labelFile = "file:///android_asset/labelmap.txt"
+    private var detector: Classifier? = null
 
-    private var previewWidth = 0
-    private var previewHeight = 0
-    private val debug = false
-    private val handler: Handler? = null
-    private val handlerThread: HandlerThread? = null
-    private var useCamera2API = false
-    private var isProcessingFrame = false
-    private val yuvBytes = arrayOfNulls<ByteArray>(3)
-    private var rgbBytes: IntArray? = null
-    private var yRowStride = 0
-    private var postInferenceCallback: Runnable? = null
-    private var imageConverter: Runnable? = null
-    private val MODEL_INPUT_SIZE = 300
+    private var preview: Preview? = null
+    private var imageCapture: ImageCapture? = null
+    private var imageAnalyzer: ImageAnalysis? = null
+    private var camera: Camera? = null
+    private var lastProcessingTimeMs: Long = 0
+    private var cropCopyBitmap: Bitmap? = null
+    private  var startStreaming:Long = 0
+    private val classes = listOf<String>("person")
+    private enum class DetectorMode {
+        TF_OD_API
+    }
+    private var cameraMode: Int = 1
+    private val modeApi: DetectorMode = DetectorMode.TF_OD_API
+    private val confidenceTf= 0.5f
+    private lateinit var outputDirectory: File
+    private lateinit var cameraExecutor: ExecutorService
+    var trackingOverlay: OverlayView? = null
 
-    private val IMAGE_SIZE = Size(640, 480)
-    private  var detector: Classifier? = null
-    private var croppedBitmap: Bitmap? = null
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
-    private var hasPermission  = true
 
-    // Minimum detection confidence to track a detection.
-    private val MINIMUM_CONFIDENCE_TF_OD_API = 0.5f
-    private val MAINTAIN_ASPECT = false
-    private val DESIRED_PREVIEW_SIZE = Size(640, 480)
-    private val SAVE_PREVIEW_BITMAP = false
-    private val TEXT_SIZE_DIP = 10f
+    private val imageSize = Size(640, 480)
+    private var isProcessing = false
+
+    private var timestamp:Long = 0
+    private var totalCount:Int = 0
+
+    private var handler: Handler? = null
+    private var handlerThread: HandlerThread? = null
+
+    private var tracker: SingleBoxTracker? = null
+    private var threadsTextView: TextView? = null
+    private var saveShot = false
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_detection)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            hasPermission = checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED
-        }
-        if (!hasPermission){
-            requestPermission()
-        }
-        setFragment()
-            /* try {
-            detector = TFLiteObjectDetectionAPIModel.create(
-                applicationContext.assets,
-                TF_OD_API_MODEL_FILE,
-                TF_OD_API_LABELS_FILE,
-                TF_OD_API_INPUT_SIZE,
-                TF_OD_API_IS_QUANTIZED
-            )
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar!!.setDisplayShowTitleEnabled(false)
+        supportActionBar!!.setDisplayHomeAsUpEnabled(true)
+        supportActionBar!!.setDisplayShowHomeEnabled(true)
+        toolbar.setNavigationIcon(R.drawable.ic_action_navigation)
 
+        // Setup the listener for take photo button
+        camera_capture_button.setOnClickListener { takePhoto() }
+        outputDirectory = getOutputDirectory()
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        setUp()
+        cameraMode = intent.getIntExtra("cameraMode", 0)
+        Log.d("Huang", "camera mode $cameraMode")
 
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Timber.e(
-                e,
-                "Exception initializing classifier!"
-            )
-            val toast = Toast.makeText(
-                applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
-            )
-            toast.show()
-            finish()
-        }
-        val cropSize: Int = MODEL_INPUT_SIZE
-        val previewWidth: Int = IMAGE_SIZE.width
-        val previewHeight: Int = IMAGE_SIZE.height
-        val sensorOrientation = 0
-        croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888)
+        // Camera mode
+        if (cameraMode == 1){
+            camera_capture_button.visibility = View.VISIBLE
+            stats_container.visibility = View.GONE
+        }else{
 
-        frameToCropTransform = ImageUtils.getTransformationMatrix(
-            previewWidth, previewHeight,
-            cropSize, cropSize,
-            sensorOrientation, false
-        )
-        cropToFrameTransform = Matrix()
-        frameToCropTransform!!.invert(cropToFrameTransform)
+            cameraPreview.visibility = View.GONE
+            viewFinder.visibility = View.VISIBLE
+        }
 
-        val canvas = Canvas()
-        loadImage("face.jpeg")?.let {
-            canvas.drawBitmap(
-                it,
-                frameToCropTransform!!,
-                null
-            )
-        }
-        val results: List<Classifier.Recognition?>? =
-            detector!!.recognizeImage(croppedBitmap)
-        Log.i("Huang", results.toString())
-
-             */
-
-    }
-    private fun requestPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
-                Toast.makeText(
-                    applicationContext,
-                    "Camera permission is required for this demo",
-                    Toast.LENGTH_LONG
-                )
-                    .show()
-            }
-            requestPermissions(
-                arrayOf(PERMISSION_CAMERA),
-                PERMISSIONS_REQUEST
-            )
-        }
-    }
-    @Throws(Exception::class)
-    private fun loadImage(fileName: String): Bitmap? {
-        val inputStream = assets.open(fileName)
-        return BitmapFactory.decodeStream(inputStream)
-    }
-    // Which detection model to use: by default uses Tensorflow Object Detection API frozen
-    // checkpoints.
-    private enum class DetectorMode {
-        TF_OD_API
-    }
-
-    /** Callback for Camera2 API  */
-    override fun onImageAvailable(reader: ImageReader) {
-        // We need wait until we have some size from onPreviewSizeChosen
-        if (previewWidth == 0 || previewHeight == 0) {
-            return
-        }
-        if (rgbBytes == null) {
-            rgbBytes = IntArray(previewWidth * previewHeight)
-        }
-        try {
-            val image = reader.acquireLatestImage() ?: return
-            if (isProcessingFrame) {
-                image.close()
-                return
-            }
-            isProcessingFrame = true
-            Trace.beginSection("imageAvailable")
-            val planes = image.planes
-            fillBytes(planes, yuvBytes)
-            yRowStride = planes[0].rowStride
-            val uvRowStride = planes[1].rowStride
-            val uvPixelStride = planes[1].pixelStride
-            imageConverter = Runnable {
-                yuvBytes[0]?.let {
-                    ImageUtils.convertYUV420ToARGB8888(
-                        it,
-                        yuvBytes.get(1)!!,
-                        yuvBytes.get(2)!!,
-                        previewWidth,
-                        previewHeight,
-                        yRowStride,
-                        uvRowStride,
-                        uvPixelStride,
-                        rgbBytes!!
-                    )
-                }
-            }
-            postInferenceCallback = Runnable {
-                image.close()
-                isProcessingFrame = false
-            }
-            processImage()
-        } catch (e: java.lang.Exception) {
-            Timber.e(e, "Exception!")
-            Trace.endSection()
-            return
-        }
-        Trace.endSection()
-    }
-    private fun fillBytes(
-        planes: Array<Plane>,
-        yuvBytes: Array<ByteArray?>
-    ) {
-        // Because of the variable row stride it's not possible to know in
-        // advance the actual necessary dimensions of the yuv planes.
-        for (i in planes.indices) {
-            val buffer = planes[i].buffer
-            if (yuvBytes[i] == null) {
-                Timber.d(
-                    "Initializing buffer %d at size %d",
-                    i,
-                    buffer.capacity()
-                )
-                yuvBytes[i] = ByteArray(buffer.capacity())
-            }
-            buffer[yuvBytes[i]]
-        }
-    }
-    private fun setFragment() {
-        val cameraId: String? = this!!.chooseCamera()
-        /*val fragment: Fragment
-        if (useCamera2API) {
-            val camera2Fragment: CameraConnectionFragment = CameraConnectionFragment.newInstance(
-                object : ConnectionCallback() {
-                    fun onPreviewSizeChosen(
-                        size: Size,
-                        rotation: Int
-                    ) {
-                        previewHeight = size.height
-                        previewWidth = size.width
-                        onPreviewSizeChosen(size, rotation)
-                    }
-                },
-                this,
-                getLayoutId(),
-                getDesiredPreviewFrameSize()
-            )
-            camera2Fragment.setCamera(cameraId)
-            fragment = camera2Fragment
+        // Request camera permissions
+        if (allPermissionsGranted()) {
+            startCamera()
         } else {
-            fragment =
-                LegacyCameraConnectionFragment(this, getLayoutId(), getDesiredPreviewFrameSize())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+            }
+            startCamera()
         }
-        fragmentManager.beginTransaction().replace(R.id.container, fragment).commit()
 
-         */
     }
-    private fun processImage() {
-        Log.i("Huang", "process image".toString())
+    override fun onSupportNavigateUp(): Boolean {
+        onBackPressed()
+        return true
+    }
+    @Synchronized
+    override fun onResume() {
+        Timber.d("onResume $this")
+        super.onResume()
+        setUp()
+        handlerThread = HandlerThread("inference")
+        handlerThread!!.start()
+        handler = Handler(handlerThread!!.looper)
+    }
 
-        // No mutex needed as this method is not reentrant.
-       /* if (computingDetection) {
-            readyForNextImage()
-            return
+    @Synchronized
+    override fun onPause() {
+        Timber.d("onPause $this")
+        handlerThread!!.quitSafely()
+        try {
+            handlerThread!!.join()
+            handlerThread = null
+            handler = null
+        } catch (e: InterruptedException) {
+            Timber.e(e, "Exception!")
         }
-        computingDetection = true
-        Timber.i("Preparing image  for detection in bg thread.")
-        rgbFrameBitmap.setPixels(getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight)
-        readyForNextImage()
-        val canvas = Canvas(croppedBitmap!!)
-        canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform!!, null)
-        // For examining the actual TF input.
-        if (SAVE_PREVIEW_BITMAP) {
-            ImageUtils.saveBitmap(croppedBitmap!!)
-        }
-
-        */
-        runInBackground(
-            Runnable {
-                Timber.i("Running detection on image")
-                detector = TFLiteObjectDetectionAPIModel.create(
-                    applicationContext.assets,
-                    TF_OD_API_MODEL_FILE,
-                    TF_OD_API_LABELS_FILE,
-                    TF_OD_API_INPUT_SIZE,
-                    TF_OD_API_IS_QUANTIZED
-                )
-                val cropSize: Int = MODEL_INPUT_SIZE
-                val previewWidth: Int = IMAGE_SIZE.width
-                val previewHeight: Int = IMAGE_SIZE.height
-                val sensorOrientation = 0
-                croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888)
-
-                frameToCropTransform = ImageUtils.getTransformationMatrix(
-                    previewWidth, previewHeight,
-                    cropSize, cropSize,
-                    sensorOrientation, false
-                )
-                cropToFrameTransform = Matrix()
-                frameToCropTransform!!.invert(cropToFrameTransform)
-
-                val canvas = Canvas()
-                loadImage("face.jpeg")?.let {
-                    canvas.drawBitmap(
-                        it,
-                        frameToCropTransform!!,
-                        null
-                    )
+        super.onPause()
+    }
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener(Runnable {
+            // Used to bind the lifecycle of cameras to the lifecycle owner
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            // Preview
+            preview = Preview.Builder()
+                .build()
+            // Select back camera
+            val cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+            try {
+                // Unbind use cases before rebinding
+                cameraProvider.unbindAll()
+                // Bind use cases to camera
+                if (cameraMode == 0){
+                    // Create ImageCapture
+                    imageCapture = ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .build()
+                    camera = cameraProvider.bindToLifecycle(
+                        this, cameraSelector, preview, imageCapture)
+                }else{
+                    imageAnalyzer = ImageAnalysis.Builder()
+                        .build()
+                        .also {
+                            it.setAnalyzer(cameraExecutor, ClassImageAnalyzer { image ->
+                               processImage(image)
+                                var timeEnd = (System.nanoTime() - startStreaming)/0.000001
+                                time_running_info.text = "$timeEnd ms"
+                            })
+                        }
+                    camera = cameraProvider.bindToLifecycle(
+                        this, cameraSelector, preview, imageAnalyzer)
                 }
-                val results: List<Classifier.Recognition?>? =
-                    detector!!.recognizeImage(croppedBitmap)
-                Log.i("Huang", results.toString())
-
-
-                /* val startTime = SystemClock.uptimeMillis()
-            val results: List<Classifier.Recognition?>? =
-                detector!!.recognizeImage(croppedBitmap)
-
-            cropCopyBitmap = Bitmap.createBitmap(croppedBitmap!!)
-            val canvas = Canvas(cropCopyBitmap)
-            val paint = Paint()
-            paint.color = Color.RED
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2.0f
-            var minimumConfidence: Float =
-                MINIMUM_CONFIDENCE_TF_OD_API
-            when (MODE) {
-                DetectorMode.TF_OD_API -> minimumConfidence =
-                    MINIMUM_CONFIDENCE_TF_OD_API
+                preview?.setSurfaceProvider(viewFinder.createSurfaceProvider(camera?.cameraInfo))
+            } catch(exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
             }
-            val mappedRecognitions: MutableList<Classifier.Recognition?> =
-                LinkedList<Classifier.Recognition?>()
-            for (result in results!!) {
-                val location: RectF = result?.getLocation() ?:
-                if (location != null && result.getConfidence() >= minimumConfidence) {
-                    canvas.drawRect(location, paint)
-                    cropToFrameTransform!!.mapRect(location)
-                    result.setLocation(location)
-                    mappedRecognitions.add(result)
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun takePhoto() {
+        // Get a stable reference of the modifiable image capture use case
+        val imageCapture = imageCapture ?: return
+        var timeEnd = (System.nanoTime() - startStreaming)/0.000001
+        time_running_info.text = "$timeEnd ms"
+        // Create timestamped output file to hold the image
+        val photoFile = File(outputDirectory, "smart.io.picture.jpg")
+        // Create output options object which contains file + metadata
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        // Setup image capture listener which is triggered after photo has
+        // been taken
+        imageCapture.takePicture(
+            outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
-            }
-            tracker.trackResults(mappedRecognitions, currTimestamp)
-            trackingOverlay.postInvalidate()
-            computingDetection = false
-
-                 */
-                runOnUiThread {
-                    /*showFrameInfo(previewWidth.toString() + "x" + previewHeight)
-                    showCropInfo(
-                        cropCopyBitmap.getWidth()
-                            .toString() + "x" + cropCopyBitmap.getHeight()
-                    )
-                    showInference(lastProcessingTimeMs.toString() + "ms")
-
-                     */
-                    Log.i("Huang", results.toString())
-
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val savedUri = Uri.fromFile(photoFile)
+                   // val msg = "Photo capture succeeded: $savedUri"
+                   // Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                   // Log.d(TAG, msg)
+                    val imageBitmap:Bitmap = BitmapFactory.decodeFile(savedUri.path)
+                    viewFinder.visibility = View.GONE
+                    cameraPreview.visibility = View.VISIBLE
+                    cameraPreview.setImageBitmap(imageBitmap)
+                    processImage(imageBitmap)
+                    camera_capture_button.visibility = View.GONE
+                    stats_container.visibility = View.VISIBLE
                 }
             })
+    }
+    private fun allPermissionsGranted() = false
+
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
+        return if (mediaDir != null && mediaDir.exists())
+            mediaDir else filesDir
+    }
+
+    companion object {
+        private const val TAG = "CameraXBasic"
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private var numThread = 6
+        private const val IMMERSIVE_FLAG_TIMEOUT = 500L
+
+    }
+    private class ClassImageAnalyzer(private val listener: DetectionListener) : ImageAnalysis.Analyzer {
+        fun Image.toBitmap(): Bitmap {
+            //val planes = image.planes
+            val yBuffer = planes[0].buffer // Y
+            val uBuffer = planes[1].buffer // U
+            val vBuffer = planes[2].buffer // V
+
+            val ySize = yBuffer.remaining()
+            val uSize = uBuffer.remaining()
+            val vSize = vBuffer.remaining()
+
+            val nv21 = ByteArray(ySize + uSize + vSize)
+            //U and V are swapped
+            yBuffer.get(nv21, 0, ySize)
+            vBuffer.get(nv21, ySize, vSize)
+            uBuffer.get(nv21, ySize + vSize, uSize)
+
+            val yuvImage = YuvImage(nv21, ImageFormat.NV21, this.width, this.height, null)
+            val out = ByteArrayOutputStream()
+            yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 50, out)
+            val imageBytes = out.toByteArray()
+            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        }
+        private fun ByteBuffer.toByteArray(): ByteArray {
+            rewind()
+            val data = ByteArray(remaining())
+            get(data)
+            return data
+        }
+        @SuppressLint("UnsafeExperimentalUsageError")
+        override fun analyze(imageProxy: ImageProxy) {
+            val image: Image = imageProxy.image!!
+            val buffer = imageProxy.planes[0].buffer
+            listener(image.toBitmap())
+            imageProxy.close()
+        }
     }
 
     @Synchronized
@@ -355,48 +280,112 @@ class DetectionActivity : AppCompatActivity(), ImageReader.OnImageAvailableListe
         handler?.post(r)
     }
 
-    private fun chooseCamera(): String? {
-        val manager =  getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        try {
-            for (cameraId in manager.cameraIdList) {
-                val characteristics =  manager.getCameraCharacteristics(cameraId)
-                // We don't use a front facing camera in this sample.
-                val facing = characteristics.get(
-                    CameraCharacteristics.LENS_FACING
-                )
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
-                    continue
+    @Throws(java.lang.Exception::class)
+    private fun loadImage(fileName: String): Bitmap? {
+        val inputStream = assets.open(fileName)
+        return BitmapFactory.decodeStream(inputStream)
+    }
+    private  fun setUp(){
+        threadsTextView = findViewById(R.id.frame_info)
+        trackingOverlay = findViewById(R.id.tracking_overlay)
+        tracker = SingleBoxTracker(applicationContext)
+        detector = TFLiteObjectDetectionAPIModel.create(
+            assets,
+            modelFile,
+            labelFile,
+            apiInputSize,
+            isQuantized
+        )
+        trackingOverlay!!.addCallback(
+            object : OverlayView.DrawCallback {
+                override fun drawCallback(canvas: Canvas) {
+                    tracker!!.draw(canvas)
                 }
-                val map = characteristics.get( CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                    ?: continue
-                useCamera2API = (facing == CameraCharacteristics.LENS_FACING_EXTERNAL
-                        || isHardwareLevelSupported(
-                    characteristics, CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL
-                ))
-                Timber.i(
-                    "Camera API lv2?: %s",
-                    useCamera2API
-                )
-                return cameraId
-            }
-        } catch (e: CameraAccessException) {
-            Timber.e(
-                e,
-                "Not allowed to access camera"
-            )
+            })
+        startStreaming = System.nanoTime()
+    }
+    private fun processImage(image: Bitmap){
+        trackingOverlay!!.postInvalidate()
+        detector!!.setNumThreads(numThread)
+        ++timestamp
+        val currTimestamp = timestamp
+        val cropSize: Int = apiInputSize
+        val previewWidth: Int = image.width
+        val previewHeight: Int = image.height
+        val sensorOrientation = 0
+        val croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888)
+        tracker!!.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
+        frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight,
+            cropSize, cropSize,
+            sensorOrientation, false
+        )
+        cropToFrameTransform = Matrix()
+        frameToCropTransform!!.invert(cropToFrameTransform)
+        val canvas = Canvas(croppedBitmap!!)
+        if (image != null) {
+            canvas.drawBitmap(image, frameToCropTransform!!, null)
         }
-        return null
-    }
-    // Returns true if the device supports the required hardware level, or better.
-    private fun isHardwareLevelSupported(
-        characteristics: CameraCharacteristics, requiredLevel: Int
-    ): Boolean {
-        val deviceLevel =
-            characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)!!
-        return if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
-            requiredLevel == deviceLevel
-        } else requiredLevel <= deviceLevel
-        // deviceLevel is not LEGACY, can use numerical sort
-    }
+        tracker!!.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
+        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap)
+        if (saveShot) {
+            val savedFile = File(
+                outputDirectory,
+                "smart.io.cropped.jpg"
+            )
+            val out = FileOutputStream(savedFile)
+            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+        }
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2.0f
+        val startTime = SystemClock.uptimeMillis()
+        val results = detector!!.recognizeImage(croppedBitmap)
+        var minimumConfidence: Float = confidenceTf
+        when (modeApi) {
+            DetectorMode.TF_OD_API -> minimumConfidence =
+                confidenceTf
+        }
+        val mappedRecognitions: MutableList<Recognition> = LinkedList()
+        var count = 0
+        for (result in results!!) {
+            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
+            val location: RectF = result.location
+            if (location != null && result.confidence!! >= minimumConfidence) {
+                if (result.title in classes){
+                    ++totalCount
+                    ++count
 
+                    total_persons_info.text = "$totalCount"
+                    frame_info.text = count.toString()
+                    inference_info.text = "$lastProcessingTimeMs fps"
+                    canvas.drawRect(location, paint)
+                    cropToFrameTransform!!.mapRect(location)
+                    result.location = location
+                    mappedRecognitions.add(result)
+                }
+            }
+        }
+        tracker!!.trackResults(mappedRecognitions, currTimestamp)
+        trackingOverlay!!.postInvalidate()
+    }
+}
+
+class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs) {
+    private val callbacks: MutableList<DrawCallback> =
+        LinkedList()
+    fun addCallback(callback: DrawCallback) {
+        callbacks.add(callback)
+    }
+    @Synchronized
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        for (callback in callbacks) {
+            callback.drawCallback(canvas)
+        }
+    }
+    interface DrawCallback {
+        fun drawCallback(canvas: Canvas)
+    }
 }
