@@ -7,7 +7,7 @@ This  app continuously detects the objects in the frames(Camera Picture capture 
 ## Demo
 Here are some screens of the final application.
 -  Menu option selection
-<img src="./screen-1.jpg" width=300">
+<img src="./screen-1.jpg" width="300">
 
 
 - Detection and people counting
