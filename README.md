@@ -1,4 +1,4 @@
-# Smart People Counter 
+# People Counter
 ## Overview  
 
 In this app, we use `Tensorflow Object Detection`  for **android** than you can find in [Tensorflow lite documentation](https://www.tensorflow.org/lite/models/object_detection/overview).
@@ -7,10 +7,12 @@ This  app continuously detects the objects in the frames(Camera Picture capture 
 ## Demo
 Here are some screens of the final application.
 -  Menu option selection
-![Home Screen](./screen-1.jpg)
+<img src="./screen-1.jpg" width="200">
+
 
 - Detection and people counting
-![Image capture](./screen-2.jpg)
+<img src="./screen-2.jpg" width="200">
+
 
 
 
